@@ -26,6 +26,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node script/copy-agents.mjs",
+    "prepublishOnly": "npm run build",
     "spike": "npm run build && node spike/run-classifier.mjs && node spike/run-doctor.mjs && node spike/run-machine.mjs && node spike/run-gate.mjs && node spike/run-plugin.mjs && node spike/run-tools.mjs && node spike/run-buildedit.mjs && node spike/run-install.mjs && node spike/run-quality.mjs"
   },
   "keywords": [
