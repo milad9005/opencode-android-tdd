@@ -1,0 +1,22 @@
+# Real Gradle discovery output captured from VeroAndroid (Gradle 8.14.3, AGP, JBR 21).
+# Used to build src/gradle/discover.ts against real output, not guesses.
+
+## Android library module :common:regex (plugins: vero.android.library + hilt + ksp)
+# `./gradlew :common:regex:tasks --all` (test-related, abridged)
+testDebugUnitTest - Run unit tests for the debug build.
+testFeatureUnitTest - Run unit tests for the feature build.
+testQaUnitTest - Run unit tests for the qa build.
+testReleaseUnitTest - Run unit tests for the release build.
+test - Run unit tests for all variants.
+compileDebugUnitTestKotlin - Compiles the debugUnitTest kotlin.
+connectedAndroidTest - Installs and runs instrumentation tests for all flavors on connected devices.
+allDevicesCheck - Runs all device checks on all managed devices defined in the TestOptions dsl.
+deviceAndroidTest - Installs and runs instrumentation tests using all Device Providers.
+# => ANDROID library. Build types: debug, feature, qa, release. No product flavors
+#    (variant name == build type, no flavor prefix). v1 picks testDebugUnitTest.
+
+## Pure JVM module :core:logger:jvm (plugin: vero.jvm.library)
+# `./gradlew :core:logger:jvm:tasks`
+test - Runs the test suite.
+testClasses - Assembles test classes.
+# => JVM library. Single `test` task, no variants. v1 picks `test`.

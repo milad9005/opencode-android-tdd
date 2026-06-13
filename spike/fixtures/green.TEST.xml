@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="co.vero.common.regex.domain.DomainRegexProviderTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-06-13T14:28:11.614Z" hostname="milad-vm" time="1.9">
+  <properties/>
+  <testcase name="Simple text should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="1.58"/>
+  <testcase name="URL ending with a space should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.027"/>
+  <testcase name="Text starting with dot before valid domain should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.024"/>
+  <testcase name="URL with COM tld and www prefix should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.04"/>
+  <testcase name="Text starting with punctuation before valid tld should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.035"/>
+  <testcase name="URL with unknown TLD should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.022"/>
+  <testcase name="URL with NET tld without protocol should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.019"/>
+  <testcase name="URL with NOW tld should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.015"/>
+  <testcase name="URL with path and NOW tld should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.018"/>
+  <testcase name="Text starting with dash before valid domain should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.015"/>
+  <testcase name="URL with uppercase characters should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.018"/>
+  <testcase name="URL with NO tld should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.015"/>
+  <testcase name="String containing a plus sign should NOT be identified as a link by current isCompleteLink logic" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.017"/>
+  <testcase name="Text with a dot but not a valid TLD should NOT be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.013"/>
+  <testcase name="URL with multiple subdomains should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.018"/>
+  <testcase name="URL with COM tld should be identified as a link" classname="co.vero.common.regex.domain.DomainRegexProviderTest" time="0.021"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,16 @@
+> Task :build-logic:convention:compileKotlin
+> Task :build-logic:convention:jar
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Could not determine the dependencies of task ':common:regex:transformDebugClassesWithAsm'.
+> Could not create task ':common:regex:compileDebugJavaWithJavac'.
+   > Failed to calculate the value of task ':common:regex:compileDebugJavaWithJavac' property 'javaCompiler'.
+      > Toolchain installation '/usr/lib/jvm/java-21-openjdk-amd64' does not provide the required capabilities: [JAVA_COMPILER]
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+
+BUILD FAILED in 15s
+5 actionable tasks: 5 executed

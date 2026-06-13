@@ -1,0 +1,40 @@
+assembleAndroidTest - Assembles all the Test applications.
+assembleUnitTest - Assembles all the unit test applications.
+build - Assembles and tests this project.
+buildDependents - Assembles and tests this project and all projects that depend on it.
+buildNeeded - Assembles and tests this project and all projects it depends on.
+compileDebugUnitTestSources
+compileFeatureUnitTestSources
+compileQaUnitTestSources
+compileReleaseUnitTestSources
+allDevicesCheck - Runs all device checks on all managed devices defined in the TestOptions dsl.
+connectedAndroidTest - Installs and runs instrumentation tests for all flavors on connected devices.
+deviceAndroidTest - Installs and runs instrumentation tests using all Device Providers.
+deviceCheck - Runs all device checks using Device Providers and Test Servers.
+test - Run unit tests for all variants.
+testDebugUnitTest - Run unit tests for the debug build.
+testFeatureUnitTest - Run unit tests for the feature build.
+testQaUnitTest - Run unit tests for the qa build.
+testReleaseUnitTest - Run unit tests for the release build.
+analyzeDebugUnitTestDependencies
+analyzeFeatureUnitTestDependencies
+analyzeQaUnitTestDependencies
+analyzeReleaseUnitTestDependencies
+assembleDebugUnitTest - Assembles main output for variant debugUnitTest
+assembleFeatureUnitTest - Assembles main output for variant featureUnitTest
+assembleQaUnitTest - Assembles main output for variant qaUnitTest
+assembleReleaseUnitTest - Assembles main output for variant releaseUnitTest
+checkDebugUnitTestAarMetadata
+checkFeatureUnitTestAarMetadata
+checkQaUnitTestAarMetadata
+checkReleaseUnitTestAarMetadata
+compileDebugUnitTestJavaWithJavac
+compileDebugUnitTestKotlin - Compiles the debugUnitTest kotlin.
+compileFeatureUnitTestJavaWithJavac
+compileFeatureUnitTestKotlin - Compiles the featureUnitTest kotlin.
+compileQaUnitTestJavaWithJavac
+compileQaUnitTestKotlin - Compiles the qaUnitTest kotlin.
+compileReleaseUnitTestJavaWithJavac
+compileReleaseUnitTestKotlin - Compiles the releaseUnitTest kotlin.
+generateDebugUnitTestAssets
+generateDebugUnitTestConfig

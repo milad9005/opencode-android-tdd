@@ -1,0 +1,127 @@
+Type-safe project accessors is an incubating feature.
+> Task :build-logic:convention:checkKotlinGradlePluginConfigurationErrors SKIPPED
+
+> Task :build-logic:convention:installGitHooks
+> Task :build-logic:convention:installGitHooks SUCCESS
+> Task :build-logic:convention:pluginDescriptors
+> Task :build-logic:convention:processResources
+> Task :build-logic:convention:compileKotlin
+> Task :build-logic:convention:compileJava NO-SOURCE
+> Task :build-logic:convention:classes
+> Task :build-logic:convention:jar
+> Task :common:regex:preBuild UP-TO-DATE
+> Task :common:resources:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:logger:jvm:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:analytics:api:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :common:resources:preBuild UP-TO-DATE
+> Task :common:regex:preDebugBuild UP-TO-DATE
+> Task :common:regex:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :common:resources:preDebugBuild UP-TO-DATE
+> Task :core:analytics:api:processResources NO-SOURCE
+> Task :core:logger:jvm:processResources NO-SOURCE
+> Task :common:resources:generateDebugBuildConfig
+> Task :common:regex:generateDebugBuildConfig
+> Task :common:regex:generateDebugResValues
+> Task :common:regex:generateDebugResources
+> Task :common:resources:generateDebugResValues
+> Task :common:resources:generateDebugResources
+> Task :common:regex:packageDebugResources
+> Task :common:regex:processDebugNavigationResources
+> Task :common:regex:parseDebugLocalResources
+> Task :common:regex:generateDebugUnitTestAssets UP-TO-DATE
+> Task :common:regex:generateDebugRFile
+> Task :common:regex:mergeDebugShaders
+> Task :common:regex:compileDebugShaders NO-SOURCE
+> Task :common:regex:generateDebugAssets UP-TO-DATE
+> Task :common:regex:javaPreCompileDebug
+> Task :common:regex:mergeDebugAssets
+> Task :common:regex:preDebugUnitTestBuild UP-TO-DATE
+> Task :common:regex:writeDebugAarMetadata
+> Task :common:regex:compileDebugLibraryResources
+> Task :common:regex:generateDebugUnitTestResValues
+> Task :common:regex:generateDebugUnitTestResources
+> Task :common:regex:extractDeepLinksDebug
+> Task :common:regex:processDebugManifest
+> Task :common:regex:javaPreCompileDebugUnitTest
+
+> Task :core:logger:jvm:compileKotlin
+w: Opt-in requirement marker kotlinx.coroutines.ExperimentalCoroutinesApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///work/project/core/logger/jvm/src/main/java/co/vero/core/logger/utils/GlobalExceptionHandler.kt:44:27 'val id: Long' is deprecated. Deprecated in Java.
+
+> Task :core:logger:jvm:compileJava NO-SOURCE
+> Task :core:logger:jvm:classes UP-TO-DATE
+> Task :core:logger:jvm:jar
+> Task :common:resources:packageDebugResources
+> Task :common:resources:processDebugNavigationResources
+> Task :common:resources:mergeDebugShaders
+> Task :common:resources:compileDebugShaders NO-SOURCE
+> Task :common:resources:generateDebugAssets UP-TO-DATE
+> Task :common:resources:javaPreCompileDebug
+> Task :common:resources:mergeDebugAssets
+> Task :common:resources:writeDebugAarMetadata
+> Task :common:resources:extractDeepLinksDebug
+> Task :common:resources:processDebugManifest
+> Task :common:regex:mapDebugUnitTestSourceSetPaths
+> Task :common:resources:parseDebugLocalResources
+> Task :common:regex:mergeDebugUnitTestAssets
+> Task :common:regex:checkDebugUnitTestAarMetadata
+> Task :common:resources:generateDebugRFile
+> Task :common:resources:compileDebugLibraryResources
+> Task :common:regex:processDebugUnitTestManifest
+> Task :core:analytics:api:compileKotlin
+> Task :core:analytics:api:compileJava NO-SOURCE
+> Task :core:analytics:api:classes UP-TO-DATE
+> Task :core:analytics:api:jar
+> Task :common:resources:compileDebugKotlin NO-SOURCE
+> Task :common:resources:compileDebugJavaWithJavac
+> Task :common:resources:bundleLibCompileToJarDebug
+> Task :common:resources:bundleLibRuntimeToJarDebug
+> Task :common:resources:processDebugJavaRes NO-SOURCE
+> Task :common:resources:createFullJarDebug
+> Task :common:regex:mergeDebugUnitTestResources
+> Task :common:regex:kspDebugKotlin
+
+> Task :common:regex:compileDebugKotlin
+w: file:///work/project/common/regex/src/main/kotlin/co/vero/common/regex/domain/DomainRegexProvider.kt:32:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+
+> Task :common:regex:compileDebugJavaWithJavac
+> Task :common:regex:processDebugJavaRes
+> Task :common:regex:transformDebugClassesWithAsm
+> Task :common:regex:bundleLibRuntimeToJarDebug
+> Task :common:regex:bundleLibCompileToJarDebug
+> Task :common:regex:createFullJarDebug
+> Task :common:regex:processDebugUnitTestResources
+> Task :common:regex:packageDebugUnitTestForUnitTest
+> Task :common:regex:generateDebugUnitTestConfig
+> Task :common:regex:kspDebugUnitTestKotlin
+
+> Task :common:regex:compileDebugUnitTestKotlin FAILED
+e: file:///work/project/common/regex/src/test/java/co/vero/common/regex/domain/ZzSpikeMissingTest.kt:15:24 Unresolved reference 'EmailRegexProvider'.
+
+[Incubating] Problems report is available at: file:///work/project/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':common:regex:compileDebugUnitTestKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 16s
+62 actionable tasks: 62 executed

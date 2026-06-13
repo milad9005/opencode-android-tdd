@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# plugin runtime state (written into target projects, never this repo)
+.opencode/android-tdd/
+.opencode-e2e-tmp/
