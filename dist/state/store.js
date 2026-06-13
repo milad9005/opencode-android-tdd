@@ -1,0 +1,147 @@
+/**
+ * Atomic, versioned, locked state store (SPEC-v2 §2.3 / Blockers #3, #4).
+ *
+ * Guarantees:
+ *  - writes are atomic: temp-file → fsync → rename (no torn JSON on crash/race).
+ *  - every mutation is compare-and-swap on a monotonic `stateVersion`; a stale
+ *    CAS fails closed (the caller must re-read and retry, never blindly write).
+ *  - a per-worktree lock with a stale-lease timeout serializes writers; a second
+ *    concurrent writer fails closed unless it explicitly takes over an expired
+ *    lease.
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync, renameSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+const STALE_LOCK_MS = 5 * 60 * 1000;
+export class CasConflictError extends Error {
+    expected;
+    actual;
+    constructor(expected, actual) {
+        super(`State version conflict: expected v${expected}, found v${actual}. Re-read and retry.`);
+        this.expected = expected;
+        this.actual = actual;
+        this.name = "CasConflictError";
+    }
+}
+export class LockHeldError extends Error {
+    holder;
+    constructor(holder) {
+        super(`Worktree lock held by ${holder.owner} since ${new Date(holder.acquiredAt).toISOString()}.`);
+        this.holder = holder;
+        this.name = "LockHeldError";
+    }
+}
+export class StateStore {
+    dir;
+    statePath;
+    lockPath;
+    token;
+    constructor(worktree, ownerToken) {
+        this.dir = join(worktree, ".opencode", "android-tdd");
+        this.statePath = join(this.dir, "state.json");
+        this.lockPath = join(this.dir, "state.lock");
+        this.token = ownerToken ?? randomBytes(8).toString("hex");
+        if (!existsSync(this.dir))
+            mkdirSync(this.dir, { recursive: true });
+    }
+    get ownerToken() {
+        return this.token;
+    }
+    exists() {
+        return existsSync(this.statePath);
+    }
+    read() {
+        if (!existsSync(this.statePath))
+            return undefined;
+        return JSON.parse(readFileSync(this.statePath, "utf8"));
+    }
+    atomicWrite(state) {
+        const tmp = `${this.statePath}.${this.token}.${randomBytes(4).toString("hex")}.tmp`;
+        const json = JSON.stringify(state, null, 2);
+        const fd = openSync(tmp, "w");
+        try {
+            writeFileSync(fd, json);
+            fsyncSync(fd);
+        }
+        finally {
+            closeSync(fd);
+        }
+        renameSync(tmp, this.statePath);
+    }
+    readLock() {
+        if (!existsSync(this.lockPath))
+            return undefined;
+        try {
+            return JSON.parse(readFileSync(this.lockPath, "utf8"));
+        }
+        catch {
+            return undefined;
+        }
+    }
+    lockIsStale(lock, now) {
+        return now - lock.acquiredAt > STALE_LOCK_MS;
+    }
+    /** Acquire the worktree lock. Fails closed if held by another live owner. */
+    acquireLock(opts = {}) {
+        const now = Date.now();
+        const existing = this.readLock();
+        if (existing && existing.owner !== this.token) {
+            if (!this.lockIsStale(existing, now) || !opts.takeoverStale) {
+                throw new LockHeldError(existing);
+            }
+        }
+        const info = { owner: this.token, acquiredAt: now };
+        const tmp = `${this.lockPath}.${this.token}.tmp`;
+        writeFileSync(tmp, JSON.stringify(info));
+        renameSync(tmp, this.lockPath);
+    }
+    releaseLock() {
+        const existing = this.readLock();
+        if (existing && existing.owner === this.token && existsSync(this.lockPath)) {
+            rmSync(this.lockPath, { force: true });
+        }
+    }
+    holdsLock() {
+        const l = this.readLock();
+        return Boolean(l && l.owner === this.token);
+    }
+    /**
+     * Compare-and-swap commit: write `next` only if the on-disk stateVersion still
+     * equals `expectedVersion`. Bumps stateVersion. Requires the lock be held.
+     */
+    commit(expectedVersion, next) {
+        if (!this.holdsLock()) {
+            throw new Error("commit() requires the worktree lock; call acquireLock() first.");
+        }
+        const current = this.read();
+        const onDisk = current?.stateVersion ?? 0;
+        if (onDisk !== expectedVersion) {
+            throw new CasConflictError(expectedVersion, onDisk);
+        }
+        const committed = {
+            ...next,
+            stateVersion: expectedVersion + 1,
+            updatedAt: Date.now(),
+        };
+        this.atomicWrite(committed);
+        return committed;
+    }
+    /** Initialize a brand-new workflow (version 0 → 1) under the lock. */
+    init(state) {
+        if (!this.holdsLock()) {
+            throw new Error("init() requires the worktree lock; call acquireLock() first.");
+        }
+        if (this.exists()) {
+            throw new Error("State already exists; refusing to overwrite. Use commit() with CAS.");
+        }
+        const committed = { ...state, stateVersion: 1, updatedAt: Date.now() };
+        this.atomicWrite(committed);
+        return committed;
+    }
+    lockAgeMs() {
+        const l = this.readLock();
+        if (!l)
+            return undefined;
+        return Date.now() - l.acquiredAt;
+    }
+}
