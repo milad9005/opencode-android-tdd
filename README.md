@@ -72,8 +72,10 @@ auto-detects a real JDK, including Android Studio's bundled JBR).
 { "plugin": ["github:milad9005/opencode-android-tdd"] }
 ```
 
-On first load it installs four agents into `.opencode/agent/` (never overwrites your edits),
-then:
+On first load it installs four agents once into your global `~/.config/opencode/agent/`
+(never overwrites your edits), so the `android-tdd` agent is available in every project.
+The gate stays dormant unless you actually select that agent, and `tdd_doctor` checks
+per-project whether the module is a supported Gradle target at runtime. Then:
 
 ```bash
 opencode --agent android-tdd
@@ -161,16 +163,21 @@ flowchart TD
     W -->|"tests ran, all pass"| GREEN["✅ GREEN<br/>→ advance"]
     W -->|"slice test asserts & fails"| RA["✅ RED_ASSERTION<br/>→ unlock IMPL"]
     W -->|"compile error: unresolved<br/>reference to the TARGET symbol"| RM["✅ RED_MISSING_SYMBOL<br/>→ unlock IMPL"]
+    W -->|"runtime NoSuchMethod for the<br/>slice's TARGET symbol (reflection)"| RMD["✅ RED_MISSING_SYMBOL_DYNAMIC<br/>→ unlock IMPL"]
     W -->|"other compile error /<br/>wrong symbol / type / syntax"| BT["⛔ BROKEN_TEST"]
     W -->|"KSP / Hilt codegen error"| BT
     W -->|"0 tests ran / all @Ignore"| NT["⛔ NO_TESTS_RUN"]
     W -->|"wrong JDK / daemon died / timeout"| EF["⛔ ENV_FAILURE"]
 ```
 
-Only the two `✅ RED_*` outcomes unlock production code. *Everything else is treated as
-broken* — the gate would rather block you than accept a fake RED. (This is validated against
-real output captured from a production Android app, including a real Hilt `@Binds` codegen
-break — see [`docs/SPIKE-red-classifier.md`](./docs/SPIKE-red-classifier.md).)
+Only the three `✅ RED_*` outcomes unlock production code. *Everything else is treated as
+broken* — the gate would rather block you than accept a fake RED. The dynamic variant
+handles a test that reflectively calls a not-yet-existing target method (a runtime
+`NoSuchMethodException`), but only under strict anti-cheat guards: the missing member must
+be the slice's own target class + an expected symbol, and the failure must be new vs
+baseline. (This is validated against real output captured from a production Android app,
+including a real Hilt `@Binds` codegen break — see
+[`docs/SPIKE-red-classifier.md`](./docs/SPIKE-red-classifier.md).)
 
 ### What a verified RED unlocks (and how it expires)
 
@@ -196,8 +203,8 @@ back to square one. That's the anti-cheat.
 
 ## The agents
 
-The plugin ships one orchestrator and three read-only specialists (auto-installed on first
-load):
+The plugin ships one orchestrator and three read-only specialists (auto-installed once into
+your global `~/.config/opencode/agent/` on first load):
 
 ```mermaid
 flowchart TD
