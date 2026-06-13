@@ -19,7 +19,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-const AGENT_NAMES = ["android-tdd", "tdd-context", "tdd-inspector", "tdd-regression"];
+// Single source of truth for the plugin's agent identities. The gate (index.ts)
+// activates for this whole family — primary + read-only subagents — so its
+// subagent-read-only invariant is reachable as defense-in-depth, while staying
+// dormant for every unrelated agent. install + gate share this list.
+export const TDD_PRIMARY_AGENT = "android-tdd";
+export const TDD_READONLY_SUBAGENTS = ["tdd-context", "tdd-inspector", "tdd-regression"];
+const AGENT_NAMES = [TDD_PRIMARY_AGENT, ...TDD_READONLY_SUBAGENTS];
 export function globalConfigDir(env = process.env) {
     const xdg = env.XDG_CONFIG_HOME;
     return join(xdg && xdg.trim() !== "" ? xdg : join(homedir(), ".config"), "opencode");

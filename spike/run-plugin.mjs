@@ -40,6 +40,11 @@ try {
   // boot the plugin like opencode would
   const hooks = await AndroidTddPlugin({ worktree: wt, directory: wt });
 
+  // Register the primary session as the TDD agent — the gate is intentionally
+  // dormant for any session whose agent wasn't recorded via chat.message, so
+  // without this every gate assertion below would no-op (read as "allowed").
+  await hooks["chat.message"]({ sessionID: "primary", agent: "android-tdd" }, { message: {}, parts: [] });
+
   const before = (tool, callID, args, sessionID = "primary") =>
     hooks["tool.execute.before"]({ tool, sessionID, callID }, { args });
   const after = (tool, callID, args, sessionID = "primary") =>

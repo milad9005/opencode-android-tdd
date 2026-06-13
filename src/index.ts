@@ -22,11 +22,11 @@ import { decideGate, type GateInput } from "./gate/decide.js";
 import type { WorkflowState } from "./state/types.js";
 import { createTools } from "./tools.js";
 import { discoverToolchain } from "./gradle/toolchain.js";
-import { installAgentsGlobal, resolveBundledAgentsDir } from "./install.js";
+import { installAgentsGlobal, resolveBundledAgentsDir, TDD_PRIMARY_AGENT, TDD_READONLY_SUBAGENTS } from "./install.js";
 import type { ShellExec, ShellResult } from "./gradle/runner.js";
 import type { GradleRunner } from "./doctor.js";
 
-const PRIMARY_AGENT = "android-tdd";
+const PRIMARY_AGENT = TDD_PRIMARY_AGENT;
 
 function extractFilePath(tool: string, args: any): string | undefined {
   if (!args || typeof args !== "object") return undefined;
@@ -130,16 +130,20 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }, optio
     toolchainId: () => toolchain.toolchain?.toolchainId,
   });
 
-  // sessionID -> agent name (populated by chat.message). The TDD gate is global,
-  // so we only act when the active agent IS the configured TDD agent; subagents
-  // (any other agent under it) are read-only.
+  // Maps each session to its agent name (recorded by chat.message). The gate
+  // activates for the TDD agent FAMILY (primary + the plugin's own read-only
+  // subagents) and is dormant for every unrelated agent. Scoping to the family
+  // makes decideGate's subagent-read-only rule reachable as defense-in-depth
+  // (opencode .md permissions are the first layer; this is the second).
   const sessionAgent = new Map<string, string>();
   const agentOf = (sessionID: string): string | undefined => sessionAgent.get(sessionID);
-  const isTddSession = (sessionID: string): boolean => agentOf(sessionID) === tddAgent;
+  const subagentNames = new Set<string>(TDD_READONLY_SUBAGENTS);
+  const isPrimary = (sessionID: string): boolean => agentOf(sessionID) === tddAgent;
   const isSubagent = (sessionID: string): boolean => {
     const a = agentOf(sessionID);
-    return a !== undefined && a !== tddAgent;
+    return a !== undefined && subagentNames.has(a);
   };
+  const inTddScope = (sessionID: string): boolean => isPrimary(sessionID) || isSubagent(sessionID);
 
   const hooks: Hooks = {
     tool: tools,
@@ -149,8 +153,10 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }, optio
     },
 
     "tool.execute.before": async (input, output) => {
-      // Dormant under every agent except the configured TDD agent.
-      if (!isTddSession(input.sessionID)) return;
+      // Dormant for every agent outside the TDD family (unrelated globally-installed
+      // agents must be untouched). Unknown sub-sessions (no chat.message recorded)
+      // also stay dormant — opencode .md permissions still block bundled subagents.
+      if (!inTddScope(input.sessionID)) return;
       const state = store.read();
       const filePath = extractFilePath(input.tool, output.args);
       const gateInput: GateInput = {
@@ -215,7 +221,7 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }, optio
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      if (input.sessionID !== undefined && !isTddSession(input.sessionID)) return;
+      if (input.sessionID !== undefined && !inTddScope(input.sessionID)) return;
       output.system.push(banner(store.read()));
     },
   };

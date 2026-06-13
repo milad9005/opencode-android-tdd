@@ -9,14 +9,22 @@ async function throwsAsync(fn) { try { await fn(); return false; } catch { retur
 
 const fakeShell = () => ({ cwd() { return this; }, env() { return this; }, quiet() { return this; }, nothrow() { return this; } });
 
-// --- a NON-gradle project: agents must NOT be installed ---
+// Isolate the GLOBAL agent install into a throwaway XDG_CONFIG_HOME so the spike
+// never touches the real ~/.config/opencode.
+const fakeXdg = mkdtempSync(join(tmpdir(), "tdd-scope-xdg-"));
+const origXdg = process.env.XDG_CONFIG_HOME;
+process.env.XDG_CONFIG_HOME = fakeXdg;
+const globalAgentDir = join(fakeXdg, "opencode", "agent");
+
+// --- agents install GLOBALLY (unconditionally), never into the project ---
 const plain = mkdtempSync(join(tmpdir(), "tdd-scope-plain-"));
 try {
   await AndroidTddPlugin({ worktree: plain, directory: plain, $: fakeShell });
-  ok("non-gradle project: no agents installed", !existsSync(join(plain, ".opencode/agent")));
+  ok("plugin load: no project .opencode/agent written", !existsSync(join(plain, ".opencode/agent")));
+  ok("plugin load: 4 agents installed globally", existsSync(globalAgentDir) && readdirSync(globalAgentDir).filter((f) => f.endsWith(".md")).length === 4);
 } finally { rmSync(plain, { recursive: true, force: true }); }
 
-// --- a gradle project: agents installed; gate scoped to the TDD agent ---
+// --- gate scoping: dormant for unrelated agents, active for the TDD family ---
 const gradle = mkdtempSync(join(tmpdir(), "tdd-scope-gradle-"));
 try {
   writeFileSync(join(gradle, "settings.gradle.kts"), "rootProject.name = \"x\"\n");
@@ -25,7 +33,6 @@ try {
   writeFileSync(join(gradle, mainFile), "// impl\n");
 
   const hooks = await AndroidTddPlugin({ worktree: gradle, directory: gradle, $: fakeShell });
-  ok("gradle project: 4 agents installed", existsSync(join(gradle, ".opencode/agent")) && readdirSync(join(gradle, ".opencode/agent")).length === 4);
 
   const before = (tool, callID, args, sessionID) => hooks["tool.execute.before"]({ tool, sessionID, callID }, { args });
   const setAgent = (sessionID, agent) => hooks["chat.message"]({ sessionID, agent }, { message: {}, parts: [] });
@@ -41,7 +48,9 @@ try {
   ok("TDD agent: write DENIED (bootstrap, no workflow)", await throwsAsync(() => before("write", "c2", { filePath: mainFile }, "tdd")));
   ok("TDD agent: banner injected", (await sysBanner("tdd")).includes("TDD gate"));
 
-  rmSync(join(gradle, ".opencode"), { recursive: true, force: true });
+  // a TDD read-only SUBAGENT — gate must be ACTIVE and deny mutation
+  await setAgent("sub", "tdd-inspector");
+  ok("TDD subagent: write DENIED (subagents read-only)", await throwsAsync(() => before("write", "cs", { filePath: mainFile }, "sub")));
 } finally { rmSync(gradle, { recursive: true, force: true }); }
 
 // --- custom agent name via options ---
@@ -56,8 +65,10 @@ try {
   ok("custom agent name from options: gate active for 'my-tdd'", await throwsAsync(() => before("write", "c3", { filePath: "src/main/Foo.kt" }, "s")));
   await hooks["chat.message"]({ sessionID: "s2", agent: "android-tdd" }, { message: {}, parts: [] });
   ok("custom agent name: default 'android-tdd' now dormant", !(await throwsAsync(() => before("write", "c4", { filePath: "src/main/Foo.kt" }, "s2"))));
-  rmSync(join(g2, ".opencode"), { recursive: true, force: true });
 } finally { rmSync(g2, { recursive: true, force: true }); }
+
+if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = origXdg;
+rmSync(fakeXdg, { recursive: true, force: true });
 
 console.log("\n" + pass + " passed, " + fail + " failed\n");
 process.exit(fail === 0 ? 0 : 1);

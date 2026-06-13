@@ -14,6 +14,8 @@
  *                                content changed (version bump), else leave,
  *   - on disk != our manifest -> user-modified -> LEAVE IT, log a notice.
  */
+export declare const TDD_PRIMARY_AGENT = "android-tdd";
+export declare const TDD_READONLY_SUBAGENTS: readonly ["tdd-context", "tdd-inspector", "tdd-regression"];
 export declare function globalConfigDir(env?: NodeJS.ProcessEnv): string;
 /**
  * Locate the bundled agent `.md` directory. Works in dev (src/agents next to
