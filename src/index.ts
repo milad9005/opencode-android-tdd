@@ -15,6 +15,8 @@
  */
 
 import type { Plugin, Hooks } from "@opencode-ai/plugin";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { StateStore } from "./state/store.js";
 import { Ledger } from "./state/ledger.js";
 import { PhaseMachine } from "./machine.js";
@@ -27,6 +29,16 @@ import type { ShellExec, ShellResult } from "./gradle/runner.js";
 import type { GradleRunner } from "./doctor.js";
 
 const PRIMARY_AGENT = "android-tdd";
+
+function isGradleProject(root: string): boolean {
+  return [
+    "settings.gradle.kts",
+    "settings.gradle",
+    "build.gradle.kts",
+    "build.gradle",
+    "gradlew",
+  ].some((f) => existsSync(join(root, f)));
+}
 
 function extractFilePath(tool: string, args: any): string | undefined {
   if (!args || typeof args !== "object") return undefined;
@@ -67,14 +79,20 @@ function banner(state: WorkflowState | undefined): string {
   return lines.join("\n");
 }
 
-export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }) => {
+export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }, options) => {
   const root = worktree ?? directory;
+  // Plugin hooks are global to the opencode instance; scope all TDD behaviour to
+  // one agent so it stays dormant under every other agent. Override via options.
+  const tddAgent = (options?.agent as string | undefined) ?? PRIMARY_AGENT;
+
   const store = new StateStore(root);
   const ledger = new Ledger(root);
   const machine = new PhaseMachine(store, ledger);
 
   const bundledAgents = resolveBundledAgentsDir(import.meta.url);
-  if (bundledAgents) {
+  // Gate install on project shape, not active agent: agents must exist before a
+  // session can name one, so global installs only touch Gradle projects.
+  if (bundledAgents && isGradleProject(root)) {
     try {
       installAgents(root, bundledAgents);
     } catch {
@@ -122,11 +140,15 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }) => {
     toolchainId: () => toolchain.toolchain?.toolchainId,
   });
 
-  // sessionID -> agent name (populated by chat.message; absent => assume primary)
+  // sessionID -> agent name (populated by chat.message). The TDD gate is global,
+  // so we only act when the active agent IS the configured TDD agent; subagents
+  // (any other agent under it) are read-only.
   const sessionAgent = new Map<string, string>();
+  const agentOf = (sessionID: string): string | undefined => sessionAgent.get(sessionID);
+  const isTddSession = (sessionID: string): boolean => agentOf(sessionID) === tddAgent;
   const isSubagent = (sessionID: string): boolean => {
-    const a = sessionAgent.get(sessionID);
-    return a !== undefined && a !== PRIMARY_AGENT;
+    const a = agentOf(sessionID);
+    return a !== undefined && a !== tddAgent;
   };
 
   const hooks: Hooks = {
@@ -137,6 +159,8 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      // Dormant under every agent except the configured TDD agent.
+      if (!isTddSession(input.sessionID)) return;
       const state = store.read();
       const filePath = extractFilePath(input.tool, output.args);
       const gateInput: GateInput = {
@@ -200,7 +224,8 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }) => {
       }
     },
 
-    "experimental.chat.system.transform": async (_input, output) => {
+    "experimental.chat.system.transform": async (input, output) => {
+      if (input.sessionID !== undefined && !isTddSession(input.sessionID)) return;
       output.system.push(banner(store.read()));
     },
   };
