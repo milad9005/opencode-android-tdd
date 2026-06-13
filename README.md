@@ -3,7 +3,7 @@
 > **A Test-Driven Development gate for Android/Kotlin — enforced in code, not in a prompt.**
 > Your AI agent *physically cannot* write production code until a real failing test exists.
 
-[![status](https://img.shields.io/badge/status-v0.1-blue)](https://github.com/milad9005/opencode-android-tdd)
+[![npm](https://img.shields.io/npm/v/opencode-android-tdd)](https://www.npmjs.com/package/opencode-android-tdd)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![opencode plugin](https://img.shields.io/badge/opencode-plugin-black)](https://opencode.ai)
 
@@ -65,10 +65,10 @@ and tells it exactly what to do next. It cannot proceed.
 auto-detects a real JDK, including Android Studio's bundled JBR).
 
 ```jsonc
-// opencode.json  — from npm…
+// opencode.json — from npm (recommended)
 { "plugin": ["opencode-android-tdd"] }
 
-// …or straight from GitHub (no npm needed)
+// …or straight from GitHub (no npm account needed)
 { "plugin": ["github:milad9005/opencode-android-tdd"] }
 ```
 
