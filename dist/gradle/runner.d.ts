@@ -25,6 +25,8 @@ export interface RunRequest {
     expectedSymbols: string[];
     sliceTestFiles: string[];
     javaHome: string;
+    sliceTargetClass?: string;
+    baselineFingerprints?: string[];
 }
 export interface RunOutcome {
     runId: string;

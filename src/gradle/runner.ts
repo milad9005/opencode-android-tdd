@@ -31,6 +31,8 @@ export interface RunRequest {
   expectedSymbols: string[];
   sliceTestFiles: string[];
   javaHome: string;
+  sliceTargetClass?: string; // FQCN of the slice's target, for reflective-RED binding
+  baselineFingerprints?: string[]; // failing identities at baseline, for new-vs-baseline
 }
 
 export interface RunOutcome {
@@ -45,6 +47,16 @@ function modulePathToDir(worktree: string, module: string): string {
   return join(worktree, rel);
 }
 
+// Build the fully-qualified Gradle task path. The agent sometimes stores testTask
+// already prefixed with the module path (":feature:x:impl:testDebugUnitTest"),
+// which a naive `${module}:${testTask}` doubles into an invalid task and fails
+// closed as BROKEN_TEST. Normalise to the bare task name, then qualify once.
+function qualifiedTask(module: string, testTask: string): string {
+  const mod = ":" + module.replace(/^:+/, "").replace(/:+$/, "");
+  const bareTask = testTask.includes(":") ? testTask.slice(testTask.lastIndexOf(":") + 1) : testTask;
+  return `${mod}:${bareTask}`;
+}
+
 function randomId(): string {
   return "run-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -52,7 +64,7 @@ function randomId(): string {
 export async function runTargetedTest(req: RunRequest, sh: ShellExec): Promise<RunOutcome> {
   const argv = [
     "./gradlew",
-    `${req.module}:${req.testTask}`,
+    qualifiedTask(req.module, req.testTask),
     "--rerun-tasks",
     "--console=plain",
     ...req.testSelectors.flatMap((t) => ["--tests", t]),
@@ -63,7 +75,13 @@ export async function runTargetedTest(req: RunRequest, sh: ShellExec): Promise<R
   const sh_result = await sh.run(req.worktree, argv, env);
 
   const moduleDir = modulePathToDir(req.worktree, req.module);
-  const suites = collectSuites(moduleDir, req.testTask);
+  // The JUnit results dir is named by the BARE task ("testDebugUnitTest"), never
+  // the module-qualified form, so normalise here too — otherwise no suites are
+  // found and a genuine RED degrades to a stale-report BROKEN_TEST.
+  const bareTask = req.testTask.includes(":")
+    ? req.testTask.slice(req.testTask.lastIndexOf(":") + 1)
+    : req.testTask;
+  const suites = collectSuites(moduleDir, bareTask);
 
   const input: ClassifierInput = {
     exitCode: sh_result.exitCode,
@@ -72,6 +90,8 @@ export async function runTargetedTest(req: RunRequest, sh: ShellExec): Promise<R
     runStartedMs,
     expectedSymbols: req.expectedSymbols,
     sliceTestFiles: req.sliceTestFiles,
+    sliceTargetClass: req.sliceTargetClass,
+    baselineFingerprints: req.baselineFingerprints,
   };
   return {
     runId: randomId(),

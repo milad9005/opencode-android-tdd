@@ -10,13 +10,14 @@
  * Signals were derived from REAL Gradle output captured against
  * VeroAndroid :common:regex (Gradle 8.14.3, AGP, Kotlin K2, Robolectric).
  */
-export type RedClass = "GREEN" | "RED_ASSERTION" | "RED_MISSING_SYMBOL" | "BROKEN_TEST" | "NO_TESTS_RUN" | "ENV_FAILURE";
+export type RedClass = "GREEN" | "RED_ASSERTION" | "RED_MISSING_SYMBOL" | "RED_MISSING_SYMBOL_DYNAMIC" | "BROKEN_TEST" | "NO_TESTS_RUN" | "ENV_FAILURE";
 export interface JUnitCase {
     classname: string;
     name: string;
     /** failure = assertion-style; error = unexpected exception/infra */
     outcome: "passed" | "failure" | "error" | "skipped";
     failureType?: string;
+    failureMessage?: string;
 }
 export interface JUnitSuite {
     name: string;
@@ -47,6 +48,12 @@ export interface ClassifierInput {
     expectedSymbols: string[];
     /** Test files that belong to the current slice (project-relative or absolute) */
     sliceTestFiles: string[];
+    /** Fully-qualified target class for the slice, used to bind a reflective
+     *  missing-symbol RED to the slice's own target (anti-cheat). Optional. */
+    sliceTargetClass?: string;
+    /** Failing identities recorded at baseline, so a dynamic RED can be proven
+     *  NEW vs baseline. Each is "classname#method" or a missing-symbol fingerprint. */
+    baselineFingerprints?: string[];
 }
 export interface ClassifierResult {
     cls: RedClass;

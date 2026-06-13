@@ -15,8 +15,6 @@
  */
 
 import type { Plugin, Hooks } from "@opencode-ai/plugin";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { StateStore } from "./state/store.js";
 import { Ledger } from "./state/ledger.js";
 import { PhaseMachine } from "./machine.js";
@@ -24,21 +22,11 @@ import { decideGate, type GateInput } from "./gate/decide.js";
 import type { WorkflowState } from "./state/types.js";
 import { createTools } from "./tools.js";
 import { discoverToolchain } from "./gradle/toolchain.js";
-import { installAgents, resolveBundledAgentsDir } from "./install.js";
+import { installAgentsGlobal, resolveBundledAgentsDir } from "./install.js";
 import type { ShellExec, ShellResult } from "./gradle/runner.js";
 import type { GradleRunner } from "./doctor.js";
 
 const PRIMARY_AGENT = "android-tdd";
-
-function isGradleProject(root: string): boolean {
-  return [
-    "settings.gradle.kts",
-    "settings.gradle",
-    "build.gradle.kts",
-    "build.gradle",
-    "gradlew",
-  ].some((f) => existsSync(join(root, f)));
-}
 
 function extractFilePath(tool: string, args: any): string | undefined {
   if (!args || typeof args !== "object") return undefined;
@@ -90,11 +78,13 @@ export const AndroidTddPlugin: Plugin = async ({ worktree, directory, $ }, optio
   const machine = new PhaseMachine(store, ledger);
 
   const bundledAgents = resolveBundledAgentsDir(import.meta.url);
-  // Gate install on project shape, not active agent: agents must exist before a
-  // session can name one, so global installs only touch Gradle projects.
-  if (bundledAgents && isGradleProject(root)) {
+  // Install the agent .md once into the GLOBAL opencode config (~/.config/opencode/
+  // agent), like a normal plugin — not into each project's .opencode/agent. The
+  // gate stays dormant unless the active agent is the TDD agent, and tdd_doctor
+  // does the per-project Gradle/JDK requirement check at runtime.
+  if (bundledAgents) {
     try {
-      installAgents(root, bundledAgents);
+      installAgentsGlobal(bundledAgents);
     } catch {
       // never block plugin load on agent install
     }

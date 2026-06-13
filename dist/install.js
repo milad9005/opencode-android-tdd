@@ -16,9 +16,14 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const AGENT_NAMES = ["android-tdd", "tdd-context", "tdd-inspector", "tdd-regression"];
+export function globalConfigDir(env = process.env) {
+    const xdg = env.XDG_CONFIG_HOME;
+    return join(xdg && xdg.trim() !== "" ? xdg : join(homedir(), ".config"), "opencode");
+}
 function sha256(s) {
     return "sha256:" + createHash("sha256").update(s).digest("hex");
 }
@@ -36,14 +41,11 @@ export function resolveBundledAgentsDir(moduleUrl) {
     ];
     return candidates.find((c) => existsSync(c) && readdirSync(c).some((f) => f.endsWith(".md")));
 }
-export function installAgents(worktree, bundledDir) {
-    const agentDir = join(worktree, ".opencode", "agent");
-    const stateDir = join(worktree, ".opencode", "android-tdd");
-    const manifestPath = join(stateDir, "agents.manifest.json");
+export function installAgents(agentDir, manifestPath, bundledDir) {
     if (!existsSync(agentDir))
         mkdirSync(agentDir, { recursive: true });
-    if (!existsSync(stateDir))
-        mkdirSync(stateDir, { recursive: true });
+    if (!existsSync(dirname(manifestPath)))
+        mkdirSync(dirname(manifestPath), { recursive: true });
     const manifest = existsSync(manifestPath)
         ? JSON.parse(readFileSync(manifestPath, "utf8"))
         : { written: {} };
@@ -83,4 +85,8 @@ export function installAgents(worktree, bundledDir) {
     }
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     return results;
+}
+export function installAgentsGlobal(bundledDir, env = process.env) {
+    const cfg = globalConfigDir(env);
+    return installAgents(join(cfg, "agent"), join(cfg, "android-tdd-agents.manifest.json"), bundledDir);
 }

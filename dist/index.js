@@ -13,25 +13,14 @@
  * does. We record each session's agent there; any session whose agent is not the
  * primary orchestrator is treated as a subagent and held read-only (SPEC-v2 §2.3).
  */
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { StateStore } from "./state/store.js";
 import { Ledger } from "./state/ledger.js";
 import { PhaseMachine } from "./machine.js";
 import { decideGate } from "./gate/decide.js";
 import { createTools } from "./tools.js";
 import { discoverToolchain } from "./gradle/toolchain.js";
-import { installAgents, resolveBundledAgentsDir } from "./install.js";
+import { installAgentsGlobal, resolveBundledAgentsDir } from "./install.js";
 const PRIMARY_AGENT = "android-tdd";
-function isGradleProject(root) {
-    return [
-        "settings.gradle.kts",
-        "settings.gradle",
-        "build.gradle.kts",
-        "build.gradle",
-        "gradlew",
-    ].some((f) => existsSync(join(root, f)));
-}
 function extractFilePath(tool, args) {
     if (!args || typeof args !== "object")
         return undefined;
@@ -77,11 +66,13 @@ export const AndroidTddPlugin = async ({ worktree, directory, $ }, options) => {
     const ledger = new Ledger(root);
     const machine = new PhaseMachine(store, ledger);
     const bundledAgents = resolveBundledAgentsDir(import.meta.url);
-    // Gate install on project shape, not active agent: agents must exist before a
-    // session can name one, so global installs only touch Gradle projects.
-    if (bundledAgents && isGradleProject(root)) {
+    // Install the agent .md once into the GLOBAL opencode config (~/.config/opencode/
+    // agent), like a normal plugin — not into each project's .opencode/agent. The
+    // gate stays dormant unless the active agent is the TDD agent, and tdd_doctor
+    // does the per-project Gradle/JDK requirement check at runtime.
+    if (bundledAgents) {
         try {
-            installAgents(root, bundledAgents);
+            installAgentsGlobal(bundledAgents);
         }
         catch {
             // never block plugin load on agent install

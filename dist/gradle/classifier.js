@@ -20,7 +20,12 @@ const RE_COMPILE_TASK_FAILED = /> Task (:[^\s]*compile[^\s]*Kotlin) FAILED/i;
 //   "> Task :mod:kspDebugUnitTestKotlin FAILED" + "KSP failed with exit code: PROCESSING_ERROR"
 // Generated/processed-code errors are NEVER a slice's missing-symbol RED.
 const RE_PROCESSOR_TASK_FAILED = /> Task (:[^\s]*(?:ksp|kapt)[^\s]*) FAILED/i;
-const RE_PROCESSOR_ERROR = /KSP failed with exit code|PROCESSING_ERROR|annotation processor|\[ksp\]|\[kapt\]/i;
+// Match only genuine processor ERRORS, never the high-volume benign "w: [ksp]"
+// warnings (Room index hints, deprecation notes) that every Hilt/Room build emits
+// on success. A bare "[ksp]" substring false-positived a valid RED as BROKEN_TEST.
+// Real failures are explicit ("KSP failed with exit code", "PROCESSING_ERROR") or
+// carry the Kotlin error prefix "e: [ksp]/[kapt]" (vs the warning prefix "w:").
+const RE_PROCESSOR_ERROR = /KSP failed with exit code|PROCESSING_ERROR|^e:\s+\[(?:ksp|kapt)\]/im;
 // Kotlin K2 diagnostic line: "e: file:///abs/Path.kt:15:24 Unresolved reference 'EmailRegexProvider'."
 const RE_DIAG = /^e:\s+(?:file:\/\/)?([^\s:]+(?:\.kt|\.java)):(\d+):(\d+)\s+(.*)$/;
 const RE_UNRESOLVED = /Unresolved reference '([^']+)'/;
@@ -63,11 +68,32 @@ function parseDiagnostics(stdout) {
     return out;
 }
 function isAssertionFailure(c) {
+    // A reflective missing-member failure (NoSuchMethod*) is reported by JUnit as a
+    // <failure>, but it must NEVER count as a generic assertion RED — it can only
+    // unlock via the guarded RED_MISSING_SYMBOL_DYNAMIC path. Otherwise a cheat
+    // (wrong owner / unexpected symbol / pre-existing) would slip through here.
+    if (DYNAMIC_MISSING_TYPES.test(c.failureType ?? ""))
+        return false;
     if (c.outcome === "failure")
         return true; // JUnit <failure> = assertion-style
     // <error> with a known assertion type still counts; everything else is infra
     const t = (c.failureType ?? "").toLowerCase();
     return /assertion|comparisonfailure|assertionfailederror|opentest4j/.test(t);
+}
+// Only these two prove a MEMBER is unimplemented (reflective lookup of a missing
+// method). NoClassDefFoundError/ClassNotFoundException are excluded for members —
+// they signal classpath/dependency/stale-build breakage, not "this method is
+// unwritten" (Oracle guard: never turn linkage failures into unlock tokens).
+const DYNAMIC_MISSING_TYPES = /^(?:java\.lang\.)?NoSuchMethod(?:Exception|Error)$/;
+// Parse "owner.method(argTypes)" out of a NoSuchMethod* message, e.g.
+//   "java.lang.NoSuchMethodException: co.vero.x.AgeGateViewModel.isAtLeast25(int,int)"
+//   "boolean co.vero.x.AgeGateViewModel.isAtLeast25(int,int)"
+// Returns the owner FQCN and bare method name, or undefined if not parseable.
+function parseMissingMember(message) {
+    const m = message.match(/([\w.$]+)\.([\w$]+)\s*\(/);
+    if (!m)
+        return undefined;
+    return { owner: m[1], method: m[2] };
 }
 function pathEndsWithAny(file, candidates) {
     const norm = file.replace(/\\/g, "/");
@@ -77,7 +103,7 @@ function pathEndsWithAny(file, candidates) {
     });
 }
 export function classify(input) {
-    const { stdout, suites, expectedSymbols, sliceTestFiles, runStartedMs } = input;
+    const { stdout, suites, expectedSymbols, sliceTestFiles, runStartedMs, sliceTargetClass, baselineFingerprints } = input;
     const compileTaskFailed = stdout.match(RE_COMPILE_TASK_FAILED);
     const processorTaskFailed = stdout.match(RE_PROCESSOR_TASK_FAILED);
     const processorError = RE_PROCESSOR_ERROR.test(stdout);
@@ -89,7 +115,7 @@ export function classify(input) {
     const base = (cls, reason, extra = {}) => ({
         cls,
         reason,
-        unlocksImpl: cls === "RED_ASSERTION" || cls === "RED_MISSING_SYMBOL",
+        unlocksImpl: cls === "RED_ASSERTION" || cls === "RED_MISSING_SYMBOL" || cls === "RED_MISSING_SYMBOL_DYNAMIC",
         evidence: {
             compileFailed: Boolean(compileTaskFailed),
             diagnostics,
@@ -150,9 +176,41 @@ export function classify(input) {
                 return nf.includes(classAsPath) || nf.endsWith(simpleName) || nf === simpleName;
             });
         };
+        // A reflective missing-MEMBER failure (NoSuchMethodException naming the slice's
+        // target) is morally identical to a compile-time unresolved-reference RED, so
+        // classify it as RED_MISSING_SYMBOL_DYNAMIC — but ONLY under the full anti-cheat
+        // guard set (Oracle): exact owner==target class, method ∈ expectedSymbols, in a
+        // slice test, NEW vs baseline, and the WHOLE failing set must be this same red
+        // (any unrelated/other failure keeps it BROKEN_TEST). Without these, reflection
+        // would be an unlock token for arbitrary unimplemented symbols.
+        const isDynamicMissingForTarget = (c) => {
+            if (!DYNAMIC_MISSING_TYPES.test(c.failureType ?? ""))
+                return false;
+            if (!inSlice(c))
+                return false;
+            const parsed = c.failureMessage ? parseMissingMember(c.failureMessage) : undefined;
+            if (!parsed)
+                return false;
+            if (!expectedSymbols.includes(parsed.method))
+                return false;
+            if (sliceTargetClass !== undefined && parsed.owner !== sliceTargetClass)
+                return false;
+            const fp = `${c.classname}#${c.name}#NoSuchMethod#${parsed.owner}.${parsed.method}`;
+            if ((baselineFingerprints ?? []).includes(fp))
+                return false;
+            return true;
+        };
+        const dynamicReds = failing.filter(isDynamicMissingForTarget);
+        if (dynamicReds.length > 0 && dynamicReds.length === failing.length) {
+            return base("RED_MISSING_SYMBOL_DYNAMIC", `${dynamicReds.length} reflective missing-symbol failure(s) for expected target(s): ${expectedSymbols.join(", ")}`);
+        }
         const assertionInSlice = failing.filter((c) => isAssertionFailure(c) && inSlice(c));
-        if (assertionInSlice.length === 0) {
-            return base("BROKEN_TEST", "Failure is an unexpected exception/error or comes from a non-slice test, not a slice assertion failure");
+        // Reject if the failing set isn't cleanly slice assertions: a mix of slice
+        // assertions and unrelated errors must fail closed (Oracle: failure-set must
+        // be clean). A reflective NoSuchMethod failure that didn't qualify above
+        // (wrong owner, unexpected symbol, pre-existing) also lands here as BROKEN_TEST.
+        if (assertionInSlice.length === 0 || assertionInSlice.length !== failing.length) {
+            return base("BROKEN_TEST", "Failure set is not exclusively slice assertion failures (unexpected exception/error, non-slice test, or unrelated failure present)");
         }
         return base("RED_ASSERTION", `${assertionInSlice.length} slice assertion failure(s)`);
     }

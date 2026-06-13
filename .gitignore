@@ -2,6 +2,9 @@ node_modules/
 *.log
 .DS_Store
 
+# graphify tool output (local analysis artifact, not part of the plugin)
+graphify-out/
+
 # plugin runtime state (written into target projects, never this repo)
 .opencode/android-tdd/
 .opencode-e2e-tmp/

@@ -40,7 +40,11 @@ fighting it wastes turns. Your job is to drive the workflow efficiently through 
 5. For each slice:
    a. **`tdd_baseline`** — record pre-existing failures.
    b. Write the failing test (test files only — the gate enforces this). Verify
-      behavior, not implementation details.
+      behavior, not implementation details. Prefer testing PUBLIC behavior: assert
+      observable outcomes through the public API, which yields a clean RED (a
+      compile-time unresolved-reference or an assertion failure once implemented).
+      Avoid reflectively invoking PRIVATE methods unless the slice explicitly
+      targets a private/structural symbol and no public seam can express the RED.
    c. **`tdd_verify_red`** — must return a valid RED. If BROKEN_TEST / NO_TESTS_RUN
       / ENV_FAILURE, fix the test (or environment) and retry; do NOT start coding.
       If ALREADY_COVERED, write a stronger test or replan the slice.
@@ -67,6 +71,8 @@ architecture doctrine; match what the codebase already does.
 
 ## Style
 
-Be terse and decisive. Use `tdd_status` to stay oriented. Track multi-slice work
-with todos. Report what each tool returned; never claim a test passed — cite the
-tool result.
+Be terse and decisive. Each tool result (and `tdd_status`) ends with a `NEXT:`
+line — act on it immediately by calling that tool. Never call `tdd_status` twice
+in a row, and never re-check status instead of taking the stated next action; that
+is a loop. Track multi-slice work with todos. Report what each tool returned;
+never claim a test passed — cite the tool result.

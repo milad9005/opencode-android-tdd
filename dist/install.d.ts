@@ -14,6 +14,7 @@
  *                                content changed (version bump), else leave,
  *   - on disk != our manifest -> user-modified -> LEAVE IT, log a notice.
  */
+export declare function globalConfigDir(env?: NodeJS.ProcessEnv): string;
 /**
  * Locate the bundled agent `.md` directory. Works in dev (src/agents next to
  * src/install.ts) and when published (dist/agents next to dist/install.js).
@@ -24,4 +25,5 @@ export interface InstallResult {
     agent: string;
     action: InstallAction;
 }
-export declare function installAgents(worktree: string, bundledDir: string): InstallResult[];
+export declare function installAgents(agentDir: string, manifestPath: string, bundledDir: string): InstallResult[];
+export declare function installAgentsGlobal(bundledDir: string, env?: NodeJS.ProcessEnv): InstallResult[];

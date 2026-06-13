@@ -26,18 +26,21 @@ export function parseSuiteXml(xml, fileMtimeMs) {
         const name = attr(caseHead, "name") ?? "";
         let outcome = "passed";
         let failureType;
+        let failureMessage;
         if (/<failure\b/.test(body)) {
             outcome = "failure";
             failureType = body.match(/<failure\b[^>]*\btype="([^"]*)"/)?.[1];
+            failureMessage = body.match(/<failure\b[^>]*\bmessage="([^"]*)"/)?.[1];
         }
         else if (/<error\b/.test(body)) {
             outcome = "error";
             failureType = body.match(/<error\b[^>]*\btype="([^"]*)"/)?.[1];
+            failureMessage = body.match(/<error\b[^>]*\bmessage="([^"]*)"/)?.[1];
         }
         else if (/<skipped\b/.test(body)) {
             outcome = "skipped";
         }
-        cases.push({ classname, name, outcome, failureType });
+        cases.push({ classname, name, outcome, failureType, failureMessage });
     }
     return {
         name: attr(head, "name") ?? "",

@@ -17,10 +17,16 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const AGENT_NAMES = ["android-tdd", "tdd-context", "tdd-inspector", "tdd-regression"];
+
+export function globalConfigDir(env: NodeJS.ProcessEnv = process.env): string {
+  const xdg = env.XDG_CONFIG_HOME;
+  return join(xdg && xdg.trim() !== "" ? xdg : join(homedir(), ".config"), "opencode");
+}
 
 function sha256(s: string): string {
   return "sha256:" + createHash("sha256").update(s).digest("hex");
@@ -53,12 +59,13 @@ interface Manifest {
   written: Record<string, string>;
 }
 
-export function installAgents(worktree: string, bundledDir: string): InstallResult[] {
-  const agentDir = join(worktree, ".opencode", "agent");
-  const stateDir = join(worktree, ".opencode", "android-tdd");
-  const manifestPath = join(stateDir, "agents.manifest.json");
+export function installAgents(
+  agentDir: string,
+  manifestPath: string,
+  bundledDir: string,
+): InstallResult[] {
   if (!existsSync(agentDir)) mkdirSync(agentDir, { recursive: true });
-  if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+  if (!existsSync(dirname(manifestPath))) mkdirSync(dirname(manifestPath), { recursive: true });
 
   const manifest: Manifest = existsSync(manifestPath)
     ? (JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest)
@@ -106,4 +113,16 @@ export function installAgents(worktree: string, bundledDir: string): InstallResu
 
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return results;
+}
+
+export function installAgentsGlobal(
+  bundledDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): InstallResult[] {
+  const cfg = globalConfigDir(env);
+  return installAgents(
+    join(cfg, "agent"),
+    join(cfg, "android-tdd-agents.manifest.json"),
+    bundledDir,
+  );
 }

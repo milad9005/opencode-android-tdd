@@ -26,20 +26,21 @@ ok("resolved bundled agents dir", Boolean(bundled), String(bundled));
 const wt = mkdtempSync(join(tmpdir(), "tdd-install-"));
 try {
   const agentDir = join(wt, ".opencode", "agent");
+  const manifestPath = join(wt, ".opencode", "android-tdd", "agents.manifest.json");
 
   // 1) fresh install writes all four
-  const r1 = installAgents(wt, bundled);
+  const r1 = installAgents(agentDir, manifestPath, bundled);
   ok("fresh install wrote all 4", r1.filter((r) => r.action === "written").length === 4);
   ok("all agent files exist", AGENTS.every((a) => existsSync(join(agentDir, `${a}.md`))));
 
   // 2) idempotent: second run keeps current, no rewrite churn
-  const r2 = installAgents(wt, bundled);
+  const r2 = installAgents(agentDir, manifestPath, bundled);
   ok("second run keeps all current", r2.every((r) => r.action === "kept-current"));
 
   // 3) user modifies one agent -> never overwritten
   const userPath = join(agentDir, "android-tdd.md");
   writeFileSync(userPath, "# my custom orchestrator\n");
-  const r3 = installAgents(wt, bundled);
+  const r3 = installAgents(agentDir, manifestPath, bundled);
   const orchestrator = r3.find((r) => r.agent === "android-tdd");
   ok("user-modified agent kept", orchestrator?.action === "kept-user-modified");
   ok("user content preserved", readFileSync(userPath, "utf8") === "# my custom orchestrator\n");
@@ -56,6 +57,7 @@ try {
   try {
     const agentDir2 = join(wt2, ".opencode", "agent");
     const stateDir2 = join(wt2, ".opencode", "android-tdd");
+    const manifestPath2 = join(stateDir2, "agents.manifest.json");
     mkdirSync(agentDir2, { recursive: true });
     mkdirSync(stateDir2, { recursive: true });
     // pretend we previously wrote an OLD version of tdd-context whose hash we record
@@ -64,9 +66,9 @@ try {
     // compute its hash the same way install.ts does (sha256 prefix)
     const { createHash } = await import("node:crypto");
     const oldHash = "sha256:" + createHash("sha256").update(oldContent).digest("hex");
-    writeFileSync(join(stateDir2, "agents.manifest.json"), JSON.stringify({ written: { "tdd-context": oldHash } }, null, 2));
+    writeFileSync(manifestPath2, JSON.stringify({ written: { "tdd-context": oldHash } }, null, 2));
 
-    const r4 = installAgents(wt2, bundled);
+    const r4 = installAgents(agentDir2, manifestPath2, bundled);
     const ctx = r4.find((r) => r.agent === "tdd-context");
     ok("plugin-owned unchanged file refreshed on bundle change", ctx?.action === "refreshed");
     ok("refreshed content matches bundle", readFileSync(join(agentDir2, "tdd-context.md"), "utf8") === readFileSync(join(bundled, "tdd-context.md"), "utf8"));

@@ -36,6 +36,20 @@ function requireState(store) {
 function activeSlice(s) {
     return s.slices.find((sl) => sl.id === s.currentSliceId);
 }
+// Derive the slice's target FQCN from its single production path so a reflective
+// missing-symbol RED can be bound to the slice's own class (anti-cheat). Only
+// returns a value when exactly one prod path maps cleanly to a Kotlin/Java source
+// under src/main/{java,kotlin}/...; otherwise undefined (classifier then skips the
+// owner-class guard but keeps every other guard).
+function targetClassFromProdPath(prodPaths) {
+    if (prodPaths.length !== 1)
+        return undefined;
+    const norm = prodPaths[0].replace(/\\/g, "/");
+    const m = norm.match(/src\/[^/]+\/(?:java|kotlin)\/(.+)\.(?:kt|java)$/);
+    if (!m)
+        return undefined;
+    return m[1].split("/").join(".");
+}
 function failingIdentities(result) {
     return result.evidence.failingCases.map((c) => ({
         classname: c.classname,
@@ -86,13 +100,50 @@ export function createTools(deps) {
             return report.message;
         },
     });
+    // The NEXT line is a loop-breaker: tdd_status is read-only and advances nothing,
+    // so without an explicit next-tool the model can re-call it forever. Keep it.
+    function nextAction(s) {
+        const slice = activeSlice(s);
+        switch (s.phase) {
+            case "INACTIVE":
+                return "Call `tdd_start` to begin.";
+            case "DOCTOR":
+                return "Call `tdd_doctor` with the target module path(s) to confirm scope and a JDK. Do NOT call tdd_status again.";
+            case "CONTEXT":
+                return "Survey the codebase (delegate to tdd-context if useful), then call `tdd_plan_set` with concrete slices.";
+            case "PLAN":
+                return "Call `tdd_plan_set` with the smallest viable slices (concrete files + target symbols).";
+            case "BASELINE":
+                return "Call `tdd_baseline` to record pre-existing failures.";
+            case "TEST_WRITE":
+                return "Write the slice's failing test (test files only), then call `tdd_verify_red`.";
+            case "IMPL":
+                return s.redProof
+                    ? "Verified RED exists. Implement the minimum in the slice's allowed production paths, then call `tdd_verify_green`."
+                    : "No verified RED yet. Call `tdd_verify_red` first.";
+            case "REFACTOR":
+                return "GREEN verified. Refactor if useful, then call `tdd_verify_green`; otherwise delegate review to tdd-inspector and call `tdd_inspect_done`.";
+            case "INSPECT":
+                return "Call `tdd_inspect_done` to finish this slice and advance to the next (or finalize if none remain).";
+            case "ARCH_GATE":
+                return "Call `tdd_arch_check` (advisory), then proceed to the regression gate.";
+            case "REGRESSION_GATE":
+                return "Optionally delegate tdd-regression, run `tdd_quality`, then call `tdd_report`.";
+            case "REPORT":
+                return "Call `tdd_report` to render the final development report.";
+            case "DONE":
+                return "Workflow complete. Nothing to do.";
+            default:
+                return "Consult `tdd_explain_block` for the next valid step.";
+        }
+    }
     const tdd_status = tool({
-        description: "Report the current TDD phase, active slice, and proof status.",
+        description: "Report the current TDD phase, active slice, proof status, and the single next tool to call. Read-only: it never advances the workflow — act on the NEXT line, do not re-call this in a loop.",
         args: {},
         async execute() {
             const s = store.read();
             if (!s)
-                return "No active workflow.";
+                return "No active workflow.\nNEXT: Call `tdd_start` to begin.";
             const slice = activeSlice(s);
             return [
                 `phase=${s.phase} version=${s.stateVersion} activated=${s.activated}`,
@@ -100,6 +151,7 @@ export function createTools(deps) {
                 `redProof=${s.redProof ? s.redProof.classifier + " run=" + s.redProof.runId : "none"}`,
                 `green=${s.greenVerifiedAt ? new Date(s.greenVerifiedAt).toISOString() : "no"}`,
                 `lease=${s.activeLease ? s.activeLease.tool + ":" + s.activeLease.filePath : "none"}`,
+                `NEXT: ${nextAction(s)}`,
             ].join("\n");
         },
     });
@@ -156,6 +208,8 @@ export function createTools(deps) {
             expectedSymbols: slice.expectedSymbols,
             sliceTestFiles: slice.allowedTestFiles,
             javaHome,
+            sliceTargetClass: targetClassFromProdPath(slice.allowedProductionPaths),
+            baselineFingerprints: (slice.baselineFailures ?? []).map((f) => `${f.classname}#${f.method}`),
         }, shell);
     }
     const tdd_baseline = tool({
